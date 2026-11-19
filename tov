@@ -1,0 +1,135 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "google-genai>=1.0",
+# ]
+# ///
+"""tov — rewrite text in a given tone of voice using Gemini.
+
+Usage:
+    tov TONE INPUT [MODEL]
+    tov INPUT [MODEL]              # with TOV_TONE set
+    echo "text" | tov TONE         # INPUT omitted or "-" reads stdin
+
+TONE and INPUT may each be literal text or a path to a file.
+"""
+
+import os
+import re
+import sys
+from pathlib import Path
+from typing import NoReturn
+
+from google import genai
+from google.genai import types
+
+DEFAULT_MODEL = "gemini-4-neon"
+
+SYSTEM_PROMPT = """You are an editor who rewrites text to match a tone-of-voice guide.
+
+Rules:
+- Rewrite the user's text so it follows the tone guidance below.
+- Preserve the meaning, facts, names, numbers, links and overall structure \
+(paragraphs, lists, headings) unless the guidance says otherwise.
+- Do not add new claims or remove substantive content.
+- Output ONLY the rewritten text: no preamble, no explanation, no quotation marks \
+around it, no code fences.
+
+<tone_guidance>
+{tone}
+</tone_guidance>"""
+
+
+def usage(msg: str) -> NoReturn:
+    print(f"tov: {msg}\n", file=sys.stderr)
+    print(__doc__.strip(), file=sys.stderr)
+    sys.exit(2)
+
+
+def resolve(value: str) -> str:
+    """Return the file's contents if value is a path to an existing file, else value."""
+    if value == "-":
+        return sys.stdin.read()
+    if len(value) < 1024 and "\n" not in value:
+        p = Path(value).expanduser()
+        if p.is_file():
+            return p.read_text()
+    return value
+
+
+def parse_args(argv: list[str]) -> tuple[str, str, str]:
+    if any(a in ("-h", "--help") for a in argv):
+        print(__doc__.strip())
+        sys.exit(0)
+
+    env_tone = os.environ.get("TOV_TONE")
+    args = list(argv)
+
+    # With TOV_TONE set, positionals are INPUT [MODEL] — unless there are two
+    # and the second doesn't look like a model name, in which case the user
+    # passed TONE INPUT explicitly and that overrides the environment.
+    looks_like_model = len(args) == 2 and re.fullmatch(r"[\w.\-/]+", args[1])
+    if env_tone is not None and (len(args) <= 1 or looks_like_model):
+        tone = env_tone
+    elif args:
+        tone = args.pop(0)
+    else:
+        usage("no tone given (pass it as the first argument or set TOV_TONE)")
+
+    if len(args) > 2:
+        usage("too many arguments")
+
+    input_arg = args[0] if args else "-"
+    model = args[1] if len(args) > 1 else os.environ.get("TOV_MODEL", DEFAULT_MODEL)
+
+    if input_arg == "-" and sys.stdin.isatty():
+        usage("no input given (pass it as an argument or pipe it on stdin)")
+
+    tone_text = resolve(tone).strip()
+    input_text = resolve(input_arg).strip()
+    if not tone_text:
+        usage("tone is empty")
+    if not input_text:
+        usage("input is empty")
+    return tone_text, input_text, model
+
+
+def main() -> None:
+    tone, text, model = parse_args(sys.argv[1:])
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        print("tov: GEMINI_API_KEY is not set", file=sys.stderr)
+        sys.exit(1)
+
+    # Use GEMINI_API_KEY only; stop the SDK preferring GOOGLE_API_KEY if set.
+    os.environ.pop("GOOGLE_API_KEY", None)
+    client = genai.Client(api_key=api_key)
+    ended_with_newline = True
+    try:
+        stream = client.models.generate_content_stream(
+            model=model,
+            contents=text,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT.format(tone=tone),
+            ),
+        )
+        for chunk in stream:
+            if chunk.text:
+                sys.stdout.write(chunk.text)
+                sys.stdout.flush()
+                ended_with_newline = chunk.text.endswith("\n")
+        if not ended_with_newline:
+            sys.stdout.write("\n")
+    except genai.errors.APIError as e:
+        if not ended_with_newline:
+            print(file=sys.stderr)
+        print(f"tov: Gemini API error ({model}): {e}", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(130)
+
+
+if __name__ == "__main__":
+    main()
