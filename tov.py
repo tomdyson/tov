@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.10"
 # dependencies = [
 #     "google-genai>=1.0",
 # ]
@@ -10,10 +10,14 @@
 Usage:
     tov TONE INPUT [MODEL]
     tov INPUT [MODEL]              # with TOV_TONE set
-    echo "text" | tov TONE         # INPUT omitted or "-" reads stdin
+    echo "text" | tov TONE [MODEL] # INPUT omitted or "-" reads stdin
+
+    tov --version
 
 TONE and INPUT may each be literal text or a path to a file.
 """
+
+__version__ = "0.1.0"
 
 import os
 import re
@@ -22,7 +26,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
 DEFAULT_MODEL = "gemini-4-neon"
 
@@ -58,9 +62,17 @@ def resolve(value: str) -> str:
     return value
 
 
+def looks_like_model(value: str) -> bool:
+    """Model IDs are single lowercase hyphenated tokens, e.g. gemini-4-neon."""
+    return bool(re.fullmatch(r"(models/)?[a-z][a-z0-9.]*(-[a-z0-9.]+)+", value))
+
+
 def parse_args(argv: list[str]) -> tuple[str, str, str]:
     if any(a in ("-h", "--help") for a in argv):
         print(__doc__.strip())
+        sys.exit(0)
+    if argv[:1] in (["-V"], ["--version"]):
+        print(f"tov {__version__}")
         sys.exit(0)
 
     env_tone = os.environ.get("TOV_TONE")
@@ -69,8 +81,9 @@ def parse_args(argv: list[str]) -> tuple[str, str, str]:
     # With TOV_TONE set, positionals are INPUT [MODEL] — unless there are two
     # and the second doesn't look like a model name, in which case the user
     # passed TONE INPUT explicitly and that overrides the environment.
-    looks_like_model = len(args) == 2 and re.fullmatch(r"[\w.\-/]+", args[1])
-    if env_tone is not None and (len(args) <= 1 or looks_like_model):
+    if env_tone is not None and (
+        len(args) <= 1 or (len(args) == 2 and looks_like_model(args[1]))
+    ):
         tone = env_tone
     elif args:
         tone = args.pop(0)
@@ -79,6 +92,11 @@ def parse_args(argv: list[str]) -> tuple[str, str, str]:
 
     if len(args) > 2:
         usage("too many arguments")
+
+    # `echo text | tov TONE MODEL`: a lone model-like argument with piped
+    # stdin is the model, and the input comes from stdin.
+    if len(args) == 1 and looks_like_model(args[0]) and not sys.stdin.isatty():
+        args.insert(0, "-")
 
     input_arg = args[0] if args else "-"
     model = args[1] if len(args) > 1 else os.environ.get("TOV_MODEL", DEFAULT_MODEL)
@@ -122,7 +140,7 @@ def main() -> None:
                 ended_with_newline = chunk.text.endswith("\n")
         if not ended_with_newline:
             sys.stdout.write("\n")
-    except genai.errors.APIError as e:
+    except errors.APIError as e:
         if not ended_with_newline:
             print(file=sys.stderr)
         print(f"tov: Gemini API error ({model}): {e}", file=sys.stderr)

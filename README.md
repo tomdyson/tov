@@ -2,25 +2,38 @@
 
 Rewrite text in a given **t**one **o**f **v**oice using Google Gemini, from the command line.
 
-`tov` is a single self-contained Python script. Its dependencies are declared inline
-([PEP 723](https://peps.python.org/pep-0723/)), so [uv](https://docs.astral.sh/uv/)
-installs them automatically on first run.
-
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tomdyson/tov/main/tov -o ~/.local/bin/tov
-chmod +x ~/.local/bin/tov
+uv tool install tov
 ```
 
-Requires `uv` and a Gemini API key in `GEMINI_API_KEY`.
+or `pipx install tov`, or `pip install tov`. You'll need a Gemini API key in `GEMINI_API_KEY`.
+
+To try it without installing:
+
+```bash
+uvx tov "Plain, friendly British English" "Please be advised that the office is closed."
+```
+
+### As a single-file script
+
+`tov.py` is self-contained: its dependencies are declared inline
+([PEP 723](https://peps.python.org/pep-0723/)), so [uv](https://docs.astral.sh/uv/)
+installs them automatically when you run it directly.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tomdyson/tov/main/tov.py -o ~/.local/bin/tov
+chmod +x ~/.local/bin/tov
+```
 
 ## Usage
 
 ```
 tov TONE INPUT [MODEL]
 tov INPUT [MODEL]              # with TOV_TONE set
-echo "text" | tov TONE         # INPUT omitted or "-" reads stdin
+echo "text" | tov TONE [MODEL] # INPUT omitted or "-" reads stdin
+tov --version
 ```
 
 - `TONE` and `INPUT` can each be literal text or a path to a file.
@@ -38,9 +51,15 @@ export TOV_TONE="Formal incident update for enterprise customers"
 tov "server's down again lol" gemini-3.5-flash
 ```
 
-When `TOV_TONE` is set and you pass two arguments, the second is treated as a model
-name if it contains no spaces (`tov INPUT MODEL`); otherwise the two are read as
-`TONE INPUT` and the tone you passed overrides the environment.
+A model name is recognised by its shape: a single lowercase hyphenated token such as
+`gemini-3.5-flash`. That lets `tov` work out what you meant:
+
+- When input is piped in, `tov TONE MODEL` reads the input from stdin.
+- When `TOV_TONE` is set, `tov INPUT MODEL` uses the tone from the environment, while
+  `tov TONE INPUT` (second argument not model-shaped) overrides it.
+
+If your input text happens to look like a model name, pass it explicitly with
+`tov TONE - MODEL` and pipe it in.
 
 ## Environment
 
@@ -49,3 +68,16 @@ name if it contains no spaces (`tov INPUT MODEL`); otherwise the two are read as
 | `GEMINI_API_KEY` | Required. Your Gemini API key.        |
 | `TOV_TONE`       | Default tone guidance (text or path). |
 | `TOV_MODEL`      | Default model.                        |
+
+## Development
+
+```bash
+uv build                 # builds dist/tov-*.whl and .tar.gz
+uv publish               # uploads to PyPI (needs a PyPI token)
+```
+
+Bump `__version__` in `tov.py` before each release.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
