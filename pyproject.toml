@@ -1,7 +1,7 @@
 [project]
 name = "tov"
 dynamic = ["version"]
-description = "Rewrite text in a given tone of voice using Gemini, from the command line"
+description = "Rewrite text in a given tone of voice using Gemini, from the command line or a local web UI"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Text Processing",
 ]
-dependencies = ["google-genai>=1.0"]
+dependencies = ["google-genai>=1.0", "httpx"]
 
 [project.urls]
 Homepage = "https://github.com/tomdyson/tov"
