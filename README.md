@@ -93,6 +93,37 @@ different models handle it:
 The server listens only on `127.0.0.1` and rejects requests from other websites.
 Stop it with Ctrl-C.
 
+## Use it from Claude Code
+
+The repo includes a Claude Code skill. Once tov is installed and `TOV_TONE` is set,
+you can ask Claude for text in your voice:
+
+> output the message using tov
+
+> draft me an email, with tov, to accept the request
+
+Claude writes the content, runs it through `tov`, and replies with the rewrite,
+noting anything tov changed that it shouldn't have.
+
+Install the skill in a Claude Code session:
+
+```
+/plugin install tov --marketplace tomdyson/tov
+```
+
+Or from a terminal, which also makes it available in the Claude desktop app's Code tab:
+
+```bash
+claude plugin install tov --marketplace tomdyson/tov
+```
+
+On Claude Code versions before 2.1.275, add the marketplace first:
+`/plugin marketplace add tomdyson/tov`, then `/plugin install tov@tov`. To get skill
+updates later, run `claude plugin update tov@tov`.
+
+Claude only sees environment variables that were set when the session started, so
+after setting `TOV_TONE` or `GEMINI_API_KEY`, start a new session.
+
 ## Environment
 
 | Variable         | Purpose                                                        |
@@ -121,7 +152,15 @@ uv build                 # builds dist/tov-*.whl and .tar.gz
 uv publish               # uploads to PyPI (needs a PyPI token)
 ```
 
-Bump `__version__` in `tov.py` before each release.
+Bump `__version__` in `tov.py` before each release. The Claude Code skill is in
+`skills/tov/SKILL.md`. When you change it, bump `version` in
+`.claude-plugin/plugin.json` too, because installed copies only update when that
+version changes. To try the skill locally:
+
+```bash
+claude plugin validate .
+claude --plugin-dir .
+```
 
 `evals/markdown_eval.py` checks that rewrites keep the input's format: no Markdown
 added to plain text, and none lost from Markdown input. Rerun it after changing the

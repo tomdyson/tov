@@ -1,0 +1,17 @@
+{
+  "name": "tov",
+  "version": "0.2.0",
+  "description": "Rewrite or draft text in your tone of voice with the tov CLI and Gemini. Needs tov installed (uv tool install tov).",
+  "author": {
+    "name": "Tom Dyson"
+  },
+  "homepage": "https://github.com/tomdyson/tov",
+  "repository": "https://github.com/tomdyson/tov",
+  "license": "MIT",
+  "keywords": [
+    "tone of voice",
+    "writing",
+    "rewrite",
+    "gemini"
+  ]
+}

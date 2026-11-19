@@ -1,0 +1,12 @@
+{
+  "name": "tov",
+  "description": "The tov skill: rewrite text in your tone of voice from Claude Code.",
+  "owner": { "name": "Tom Dyson" },
+  "plugins": [
+    {
+      "name": "tov",
+      "source": "./",
+      "description": "Rewrite or draft text in your tone of voice with the tov CLI and Gemini."
+    }
+  ]
+}
